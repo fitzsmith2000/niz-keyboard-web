@@ -25,6 +25,24 @@
       "macro": true,
       "parameters": true,
       "mobileNoOverflow": true
+    },
+    "visualRefresh": {
+      "version": "0.4.0",
+      "reference": "Wootility v5.4.2 live remap page",
+      "surfaces": "flat neutral grey; no added gradients or card shadows",
+      "localFont": "Nunito Sans (SIL OFL 1.1)",
+      "icons": "Google Material Symbols (Apache 2.0)",
+      "uploadDownloadArrowsRemoved": true,
+      "fontLoaded": true,
+      "editUndoDrag": true,
+      "responsiveWidths": [
+        1440,
+        1280,
+        1024,
+        768,
+        390
+      ],
+      "pageErrors": 0
     }
   },
   "protocolTests": {

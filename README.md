@@ -6,6 +6,9 @@ NiZ mini84 的浏览器配置工具，使用原厂协议和 WebHID。界面依�
 
 ## 使用
 
+网页：[fitzsmith2000.github.io/niz-keyboard-web](https://fitzsmith2000.github.io/niz-keyboard-web/)
+
+
 使用桌面 Chrome 或 Edge 打开已部署的 HTTPS 页面，点击「连接键盘」，在浏览器授权框选择 mini84。连接后读取全部配置并自动保存本地备份。
 
 - 点击键帽、选择功能，再点「应用此键」。也可以把功能拖到键帽上。
@@ -38,9 +41,11 @@ NiZ mini84 的浏览器配置工具，使用原厂协议和 WebHID。界面依�
 
 ## 数据与部署
 
-无第三方运行依赖、统计脚本、外部字体或云端配置数据库。键位、宏、按键计数在浏览器和 USB 设备之间处理，不通过网站服务端传输。网站源代码不包含个人键盘配置、按键计数或原生备份文件。
+无第三方 JavaScript 运行依赖、统计脚本、远程字体请求或云端配置数据库。Nunito Sans 字体和 Material 图标在本站托管，来源与许可证见 `THIRD_PARTY_NOTICES.md`。键位、宏、按键计数在浏览器和 USB 设备之间处理，不通过网站服务端传输。网站源代码不包含个人键盘配置、按键计数或原生备份文件。
 
-使用 Sites 发布为当前账号私有站点。站点登录仅用于访问网页，不参与键盘数据处理。HTTPS 站点和 localhost 都可用 WebHID；file:// 不作为验证入口。
+公开网页使用 GitHub Pages 托管，推送到 `main` 后由 `.github/workflows/pages.yml` 检查协议并部署 `dist/`。原 Sites 站点保留账号私有访问。HTTPS 站点和 localhost 都可用 WebHID；file:// 不作为验证入口。
+
+不同网址的浏览器备份互相隔离。迁移到 GitHub Pages 前，可从原网址导出 JSON，再在新网址导入。
 
 ## 本地开发
 
@@ -55,7 +60,7 @@ python3 -m http.server 4179 --bind 127.0.0.1 --directory dist
 
 ## 设计与协议参考
 
-- [Wootility 官方网页](https://wootility.io/) v5.4.2 的演示与自定义按键页面是本次用户指定的 UI/UX 参考。保留 NiZ 名称与独立标识，未复制 Wooting 标志、图片资源或实现代码。
+- [Wootility 官方网页](https://wootility.io/) v5.4.2 的演示与自定义按键页面是本次用户指定的 UI/UX 参考。采用同款 Nunito Sans 字体与通用 Material 图标；保留 NiZ 名称与独立标识，未复制 Wooting 标志、产品图片或实现代码。
 - [Chrome WebHID 官方文档](https://developer.chrome.com/docs/capabilities/hid)。
 - NiZ 协议依据用户提供的 NiZKBHWI.dll 以及本项目原生版本的实机记录，沿用 64 字节报告和原始宏保留方式。
 
