@@ -40,7 +40,6 @@
     "hardwareTested": false,
     "source": "Official supplied Mac v1.2 CFString constants and Windows KBDLL.dll disassembly",
     "browser": "Headless Chrome with simulated HID; tests/browser_calibration.py",
-    "groups": 21,
     "releaseAck": "00 DA DA",
     "pressAck": "00 DE DE",
     "checks": {
@@ -48,16 +47,21 @@
       "demoBlocked": true,
       "backupBeforeLock": true,
       "releaseBeforePress": true,
-      "full21Groups": true,
       "unlockOnFinish": true,
       "unlockOnFailure": true,
       "unlockOnClose": true,
-      "completedReleaseStatusRetained": true,
-      "captureDisabledAfterEnd": true,
       "noKeymapWrite": true,
       "mobileNoOverflow": true,
-      "pageErrors": 0
+      "pageErrors": 0,
+      "linearStage": true,
+      "canRepeatBeyond21": true,
+      "finishAfterSingleSample": true,
+      "finishWithoutPress": true,
+      "exitBeforeRelease": true,
+      "captureUnavailableAfterEnd": true
     },
-    "limitation": "No release or held-key calibration request sent to physical hardware; physical sampling and key behavior remain unverified."
+    "limitation": "No release or held-key calibration request sent to physical hardware; physical sampling and key behavior remain unverified.",
+    "mode": "Linear single-stage flow with user-chosen 1–4 held keys; no fixed groups or minimum capture count",
+    "simulatedPressSamples": 23
   }
 }
