@@ -60,6 +60,8 @@ class FakeHID extends EventTarget {
     if(p[1]===0xe2)reply=this.blob(0xe0,this.profile.lights,0xe6);
     if(p[1]===0xd3)reply=this.blob(0xd4,this.profile.triggers,0xd1);
     if(p[1]===0xe3){const bytes=new Uint8Array(336),view=new DataView(bytes.buffer);this.profile.counters.forEach((n,i)=>view.setUint32(i*4,n,true));reply=this.blob(0xe3,Array.from(bytes),0xe6);}
+    if(p[1]===0xdb)reply=[command(0xda,[0xda])];
+    if(p[1]===0xdd)reply=[command(0xde,[0xde])];
     if(p[1]===0xf1)this.writing=[];
     if(p[1]===0xf0)this.writing.push(p);
     if(p[1]===0xf6)this.profile.mappings=parseReports(this.writing);
@@ -84,4 +86,46 @@ test('WebHID writes all 756 records and verifies readback after a changed key',a
 test('WebHID does not overwrite external edits after read',async()=>{
   const device=new FakeHID(),channel=new NiZDevice(device);await channel.open();const base=await channel.snapshot();device.profile.mappings[0]=encode(1,1,{kind:0,codes:[2]});
   await assert.rejects(()=>channel.write(base,base,async()=>{}),/配置已变化/);assert.equal(device.sent.some(p=>p[1]===0xf1),false);await channel.close();
+});
+
+test('calibration backs up before locking and uses official DB / DA DA, DD / DE DE commands',async()=>{
+  const device=new FakeHID(),channel=new NiZDevice(device);await channel.open();
+  let backup=false;
+  const snapshot=await channel.beginCalibration(async(current,label)=>{assert.equal(device.sent.some(p=>p[1]===0xd9),false);assert.equal(label,'校准前键位备份');assert.equal(current.mappings.length,756);backup=true;});
+  assert.ok(backup);assert.equal(snapshot.mappings.length,756);assert.equal(channel.calibrationActive,true);
+  assert.deepEqual(device.sent.at(-1).slice(0,4),[0,0xd9,0,0]);
+  await assert.rejects(()=>channel.calibrate('press'),/先完成释放/);
+  await channel.calibrate('release');assert.equal(channel.calibrationReleased,true);
+  assert.equal(device.sent.at(-1)[1],0xdb);
+  await channel.calibrate('press');assert.equal(device.sent.at(-1)[1],0xdd);
+  await assert.rejects(()=>channel.snapshot(),/结束校准/);
+  await assert.rejects(()=>channel.write(snapshot,snapshot,async()=>{}),/校准期间/);
+  await channel.endCalibration();assert.equal(channel.calibrationActive,false);assert.deepEqual(device.sent.at(-1).slice(0,4),[0,0xd9,1,0]);await channel.close();
+});
+test('calibration cannot lock when backup storage fails',async()=>{
+  const device=new FakeHID(),channel=new NiZDevice(device);await channel.open();
+  await assert.rejects(()=>channel.beginCalibration(async()=>{throw Error('backup failed');}),/backup failed/);
+  assert.equal(device.sent.some(p=>p[1]===0xd9),false);assert.equal(channel.calibrationActive,false);await channel.close();
+});
+test('calibration ignores unrelated reply prefixes instead of claiming success',async()=>{
+  const device=new FakeHID(),channel=new NiZDevice(device);await channel.open();
+  await assert.rejects(()=>channel.query(0xf9,null,{reply:[0,0xda,0xda],timeout:20}),/响应超时/);
+  assert.equal(channel.pending,null);await channel.close();
+});
+test('failed calibration command sends unlock before returning the error',async()=>{
+  const device=new FakeHID(),channel=new NiZDevice(device);await channel.open();await channel.beginCalibration(async()=>{});
+  const send=device.sendReport.bind(device);device.sendReport=async(id,p)=>{if(p[1]===0xdb)throw Error('USB failed');return send(id,p);};
+  await assert.rejects(()=>channel.calibrate('release'),/USB failed/);
+  assert.equal(channel.calibrationActive,false);assert.deepEqual(device.sent.at(-1).slice(0,4),[0,0xd9,1,0]);await channel.close();
+});
+test('closing an idle calibration session unlocks before closing USB',async()=>{
+  const device=new FakeHID(),channel=new NiZDevice(device);await channel.open();await channel.beginCalibration(async()=>{});await channel.close();
+  assert.equal(device.opened,false);assert.equal(channel.calibrationActive,false);assert.deepEqual(device.sent.at(-1).slice(0,4),[0,0xd9,1,0]);
+});
+test('closing during capture cancels the receiver and attempts keyboard unlock',async()=>{
+  const device=new FakeHID(),channel=new NiZDevice(device);await channel.open();await channel.beginCalibration(async()=>{});
+  const query=channel.query(0xf9,null,{reply:[0,0xda,0xda],timeout:1000});
+  const rejected=assert.rejects(()=>query,/连接已关闭/);
+  await new Promise(resolve=>setTimeout(resolve,100));await channel.close();await rejected;
+  assert.equal(device.opened,false);assert.deepEqual(device.sent.at(-1).slice(0,4),[0,0xd9,1,0]);
 });

@@ -28,12 +28,36 @@
     }
   },
   "protocolTests": {
-    "passed": 10,
+    "passed": 16,
     "failed": 0
   },
   "reference": {
     "url": "https://wootility.io/",
     "version": "v5.4.2",
     "scope": "Visual layout and interaction reference; no Wooting code, logos, or device firmware copied."
+  },
+  "calibration": {
+    "hardwareTested": false,
+    "source": "Official supplied Mac v1.2 CFString constants and Windows KBDLL.dll disassembly",
+    "browser": "Headless Chrome with simulated HID; tests/browser_calibration.py",
+    "groups": 21,
+    "releaseAck": "00 DA DA",
+    "pressAck": "00 DE DE",
+    "checks": {
+      "copyClean": true,
+      "demoBlocked": true,
+      "backupBeforeLock": true,
+      "releaseBeforePress": true,
+      "full21Groups": true,
+      "unlockOnFinish": true,
+      "unlockOnFailure": true,
+      "unlockOnClose": true,
+      "completedReleaseStatusRetained": true,
+      "captureDisabledAfterEnd": true,
+      "noKeymapWrite": true,
+      "mobileNoOverflow": true,
+      "pageErrors": 0
+    },
+    "limitation": "No release or held-key calibration request sent to physical hardware; physical sampling and key behavior remain unverified."
   }
 }

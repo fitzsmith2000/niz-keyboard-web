@@ -5,6 +5,8 @@ export class NiZDevice {
     assert(device.vendorId===MODEL.vendorId&&device.productId===MODEL.productId&&device.collections.some(c=>c.usagePage===MODEL.usagePage&&c.outputReports.some(r=>r.reportId===0&&r.items.reduce((bits,item)=>bits+item.reportSize*item.reportCount,0)===512)), '所选设备没有受支持的 mini84 配置接口。');
     this.device=device;
     this.pending=null;
+    this.calibrationActive=false;
+    this.calibrationReleased=false;
     this.input=event=>{
       if(!this.pending) return;
       const p=Array.from(new Uint8Array(event.data.buffer,event.data.byteOffset,event.data.byteLength));
@@ -13,23 +15,23 @@ export class NiZDevice {
       if(job.end!==null&&(p[0]===job.end||(p[0]===0&&p[1]===job.end))) return job.resolve(job.packets);
       job.packets.push(p);
       if(job.packets.length>8192) return job.reject(new Error('设备返回的数据超过支持容量。'));
-      if(job.end===null&&p[0]===0&&p[1]===job.op) job.resolve(job.packets);
+      if(job.end===null&&job.reply.every((value,index)=>p[index]===value)) job.resolve(job.packets);
     };
     device.addEventListener('inputreport',this.input);
   }
   async open() { if(!this.device.opened) await this.device.open(); }
   async close() {
-    this.pending?.reject(new Error('设备连接已关闭。'));
-    this.device.removeEventListener('inputreport',this.input);
-    if(this.device.opened) await this.device.close();
+    if(this.pending){this.pending.reject(new Error('设备连接已关闭。'));await Promise.resolve();}
+    try { if(this.calibrationActive&&this.device.opened) await this.endCalibration(); }
+    finally { this.device.removeEventListener('inputreport',this.input); if(this.device.opened) await this.device.close(); }
   }
-  async query(op,end=null) {
+  async query(op,end=null,{reply=[0,op],timeout=12000}={}) {
     await pause(80); // Confirmed mini84 needs a pause after each stream terminator.
     assert(!this.pending,'另一项读取正在进行中。');
     let timer;
     const result=new Promise((resolve,reject)=>{
-      this.pending={op,end,packets:[],resolve,reject};
-      timer=setTimeout(()=>reject(new Error('键盘响应超时。请关闭其他配置工具，检查数据线后重试。')),12000);
+      this.pending={op,end,reply,packets:[],resolve,reject};
+      timer=setTimeout(()=>reject(new Error('键盘响应超时。请关闭其他配置工具，检查数据线后重试。')),timeout);
     });
     // Attach a rejection handler before sendReport so a USB failure cannot leave an unhandled receiver.
     const sending=this.device.sendReport(0,new Uint8Array(command(op))).catch(error=>this.pending?.reject(error));
@@ -37,6 +39,7 @@ export class NiZDevice {
     finally { clearTimeout(timer); this.pending=null; }
   }
   async snapshot(progress=()=>{}) {
+    assert(!this.calibrationActive,'请先结束校准并恢复键盘输入。');
     progress('识别键盘',0.03);
     const versionBytes=(await this.query(0xf9))[0].slice(2);
     const end=versionBytes.indexOf(0);
@@ -53,7 +56,39 @@ export class NiZDevice {
     const data=new DataView(new Uint8Array(bytes).buffer);
     return {schema:1,capturedAt:new Date().toISOString(),vendorID:MODEL.vendorId,productID:MODEL.productId,locationID:0,version,mappings,lights,triggers,counters:Array.from({length:84},(_,i)=>data.getUint32(i*4,true))};
   }
+  async beginCalibration(saveBackup,progress=()=>{}) {
+    assert(!this.calibrationActive,'校准模式已开启。');
+    const snapshot=await this.snapshot(progress);
+    await saveBackup(snapshot,'校准前键位备份');
+    // D9 00 suppresses ordinary key reports while the user holds calibration groups.
+    this.calibrationActive=true;
+    this.calibrationReleased=false;
+    try {
+      await this.device.sendReport(0,new Uint8Array(command(0xd9,[0])));
+      await pause(200);
+    } catch(error) { await this.endCalibration(); throw error; }
+    return snapshot;
+  }
+  async calibrate(step) {
+    assert(this.calibrationActive,'请先进入校准模式。');
+    assert(step==='release'||step==='press','未知校准步骤。');
+    assert(step!=='press'||this.calibrationReleased,'请先完成释放校准。');
+    try {
+      // The official Mac tool waits 200 ms, then matches 00 DA DA / 00 DE DE.
+      await pause(200);
+      const reports=await this.query(step==='release'?0xdb:0xdd,null,{reply:step==='release'?[0,0xda,0xda]:[0,0xde,0xde]});
+      if(step==='release')this.calibrationReleased=true;
+      return reports[reports.length-1];
+    } catch(error) { await this.endCalibration(); throw error; }
+  }
+  async endCalibration() {
+    assert(!this.pending,'请等待本次采集完成后再结束校准。');
+    await this.device.sendReport(0,new Uint8Array(command(0xd9,[1])));
+    this.calibrationActive=false;
+    this.calibrationReleased=false;
+  }
   async write(target,baseline,saveBackup,progress=()=>{}) {
+    assert(!this.calibrationActive,'校准期间不能写入按键配置。');
     let began=false;
     try {
       const current=await this.snapshot((phase,ratio)=>progress(`写入前检查 · ${phase}`,ratio*0.3));
