@@ -1,0 +1,39 @@
+{
+  "hardware": {
+    "result": "PASS",
+    "transport": "Browser WebHID",
+    "version": "mini84EC(S);V2.3.3;V1.0;",
+    "mappings": 756,
+    "mappingsEqual": true,
+    "triggersEqual": true,
+    "lightsEqual": true,
+    "beforeMappingSHA256": "cc5b51846866aae44493e558ef4e89a820e3490391df35f9c23321b34563f4ce",
+    "afterMappingSHA256": "cc5b51846866aae44493e558ef4e89a820e3490391df35f9c23321b34563f4ce",
+    "backup": "IndexedDB, label 写入前",
+    "scope": "Current configuration written unchanged; no remapping, calibration or firmware flashing"
+  },
+  "ui": {
+    "result": "PASS",
+    "checks": {
+      "singleEdit": true,
+      "demoCannotWrite": true,
+      "layer9": true,
+      "dragDrop": true,
+      "contextUndo": true,
+      "shortcut": true,
+      "chord": true,
+      "macro": true,
+      "parameters": true,
+      "mobileNoOverflow": true
+    }
+  },
+  "protocolTests": {
+    "passed": 10,
+    "failed": 0
+  },
+  "reference": {
+    "url": "https://wootility.io/",
+    "version": "v5.4.2",
+    "scope": "Visual layout and interaction reference; no Wooting code, logos, or device firmware copied."
+  }
+}
