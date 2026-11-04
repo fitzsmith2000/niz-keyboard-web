@@ -1,3 +1,4 @@
+import {renderShortcuts} from './shortcuts.js';
 import {renderRT,resetTravel} from './rt.js';
 import {MODEL,DEFAULT_CODES,ROWS,assert,recordId,decode,encode,equal,validateSnapshot,demoSnapshot} from './protocol.js';
 import {KEY_NAMES,keyName} from './keycodes.js';
@@ -60,6 +61,7 @@ function renderControls(){
   $$('#layers button').forEach(button=>button.disabled=state.busy);
   $('#notice-action').disabled=state.busy;
   if(state.view==='rt')renderRT(state,renderControls,showDialog,escapeHTML,widths);
+  if(state.view==='shortcuts')renderShortcuts(state,escapeHTML);
   if(state.view==='calibration')renderCalibration();
 }
 function renderBoard(){
@@ -101,7 +103,7 @@ function renderEditor(){
 }
 async function renderBackups(){
   state.backupItems=await backups();
-  $('#view-backups').innerHTML=`<div class="section-actions"><button class="button button-primary" id="import-button">导入 JSON 配置</button><button class="button" id="backup-export">导出当前配置</button></div><div class="panel section-panel"><h2>本地备份</h2><p>读取后与写入前自动备份，保存在当前浏览器。原生 Mac 版的 JSON 备份也可以直接导入。下载到本机的文件可以长期保存。</p><p>备份属于当前网址和浏览器。更换网址、浏览器或清除站点数据后，需要导入已下载的备份。</p></div><div class="backup-list">${state.backupItems.length?state.backupItems.map(item=>`<article class="backup-item"><div><strong>${escapeHTML(item.label)} · mini84</strong><small>${escapeHTML(new Date(item.createdAt).toLocaleString('zh-CN'))} / 756 条按键定义</small></div><div><button class="button" data-backup-download="${escapeHTML(item.id)}">下载</button><button class="button" data-backup-restore="${escapeHTML(item.id)}">恢复到编辑器</button></div></article>`).join(''):'<div class="empty-state">暂无备份。读取键盘或写入前会自动保存。</div>'}</div>`;
+  $('#view-backups').innerHTML=`<div class="section-actions"><button class="button button-primary" id="import-button">导入 JSON 配置</button><button class="button" id="backup-export">导出当前配置</button></div><div class="panel section-panel"><h2>本地备份</h2><p>读取后与写入前自动备份，保存在当前浏览器。原生 Mac 版的 JSON 备份也可以直接导入。下载到本机的文件可以长期保存。</p><p>备份属于当前网址和浏览器。更换网址、浏览器或清除站点数据后，需要导入已下载的备份。</p></div><div class="backup-list">${state.backupItems.length?state.backupItems.map(item=>`<article class="backup-item"><div><strong>${escapeHTML(item.label)} · mini84v6pro</strong><small>${escapeHTML(new Date(item.createdAt).toLocaleString('zh-CN'))} / 756 条按键定义</small></div><div><button class="button" data-backup-download="${escapeHTML(item.id)}">下载</button><button class="button" data-backup-restore="${escapeHTML(item.id)}">恢复到编辑器</button></div></article>`).join(''):'<div class="empty-state">暂无备份。读取键盘或写入前会自动保存。</div>'}</div>`;
 }
 function renderCounters(){
   const counts=state.snapshot.counters,total=counts.reduce((a,b)=>a+b,0),max=Math.max(1,...counts);
@@ -114,7 +116,7 @@ function renderCalibration(){
     <ol class="calibration-stepper" aria-label="校准流程">${['准备','释放采样','按下采样'].map((label,i)=>`<li class="${i===step?'current':i<step?'done':''}" ${i===step?'aria-current="step"':''}><span>${i<step?'✓':String(i+1).padStart(2,'0')}</span>${label}</li>`).join('')}</ol>
     <div class="calibration-stage" data-stage="${step}">
       <div class="calibration-stage-heading"><span class="calibration-stage-number">${String(step+1).padStart(2,'0')}</span><div><div class="calibration-stage-label">${active?'校准模式 · 键盘输入已暂停':'静电容校准'}</div><h2>${!active?'准备校准':released?'按需采集按下状态':'采集释放状态'}</h2></div></div>
-      ${!active?`<p>先采集全部按键的释放状态，再自行按住任意 1～4 个需要校准的键进行按下采样。</p><p>按需重复采样，完成后随时结束。校准期间请使用鼠标操作。</p><div class="calibration-note">开始前自动备份键位配置。键位备份不包含电容采样值，无法撤销电容校准。</div>${!channel?'<p class="calibration-status">请先连接并读取 mini84。演示模式不会发送校准指令。</p>':hasChanges()?'<p class="calibration-status">有未保存的键位或 RT 修改，请先保存或撤销。</p>':''}`:released?`<p>自行按住任意 <strong>1～4 个</strong>需要校准的键，全部按到底并保持按住，再用鼠标点击「按下采样」。</p><p>收到采样完成回复后松开。可以换键继续采样，也可以直接结束。</p><div class="calibration-sample-count"><strong>${state.calibrationSamples}</strong><span>次按下采样完成<small>次数仅记录采样操作，设备不返回具体按键。</small></span></div>`:'<p>松开全部按键，保持键盘不受按压，再点击「释放采样」。</p><p>采集中不要触碰键盘，收到完成回复后进入按下采样。</p>'}
+      ${!active?`<p>先采集全部按键的释放状态，再自行按住任意 1～4 个需要校准的键进行按下采样。</p><p>按需重复采样，完成后随时结束。校准期间请使用鼠标操作。</p><div class="calibration-note">开始前自动备份键位配置。键位备份不包含电容采样值，无法撤销电容校准。</div>${!channel?'<p class="calibration-status">请先连接并读取 mini84v6pro。演示模式不会发送校准指令。</p>':hasChanges()?'<p class="calibration-status">有未保存的键位或 RT 修改，请先保存或撤销。</p>':''}`:released?`<p>自行按住任意 <strong>1～4 个</strong>需要校准的键，全部按到底并保持按住，再用鼠标点击「按下采样」。</p><p>收到采样完成回复后松开。可以换键继续采样，也可以直接结束。</p><div class="calibration-sample-count"><strong>${state.calibrationSamples}</strong><span>次按下采样完成<small>次数仅记录采样操作，设备不返回具体按键。</small></span></div>`:'<p>松开全部按键，保持键盘不受按压，再点击「释放采样」。</p><p>采集中不要触碰键盘，收到完成回复后进入按下采样。</p>'}
       <div class="calibration-actions">${!active?`<button class="button button-primary" id="cal-begin" ${state.busy||!channel||hasChanges()?'disabled':''}>进入校准模式</button>`:released?`<button class="button button-primary" id="cal-press" ${state.busy?'disabled':''}>按下采样</button>`:`<button class="button button-primary" id="cal-release" ${state.busy?'disabled':''}>释放采样</button>`}${active?`<button class="button" id="cal-finish" ${state.busy?'disabled':''}>${released?'结束校准并恢复输入':'退出校准并恢复输入'}</button>`:''}</div>
     </div>
     <div class="calibration-progress" role="status" aria-live="polite"><span>${escapeHTML(state.calibrationMessage||'未开始校准。')}</span></div>
@@ -126,20 +128,20 @@ function renderParameters(){
   $('#view-parameters').innerHTML=`<div class="panel section-panel"><h2>触发参数 <span class="tiny-badge">只读</span></h2><p>${state.mode==='demo'?'当前为演示数据。连接键盘后显示真实参数。':'已读取 84 组原始参数，每键 3 字节。上限、下限与动态阈值可在「触发行程与 RT」编辑；此处保留原始字节供核对。'}</p><div class="parameter-grid">${Array.from({length:84},(_,i)=>`<div class="parameter-cell"><small>KEY ${i+1}</small><code>${snapshot.triggers.slice(i*3,i*3+3).map(n=>n.toString(16).toUpperCase().padStart(2,'0')).join(' ')}</code></div>`).join('')}</div></div><div class="panel section-panel"><h2>灯光与设备信息</h2><p>当前为 mini84EC(S) 非 RGB 型号。灯光区域的 252 字节数据随完整备份保留，目前不提供灯光写入。</p><p>${escapeHTML(snapshot.version)}</p><p>USB 0483:5235 · 84 键 · 9 层 · 756 条定义</p></div>`;
 }
 function renderHelp(){
-  $('#view-help').innerHTML=`<div class="help-grid"><div class="panel section-panel help-card"><h3>01 / 连接与读取</h3><p>使用桌面版 Chrome 或 Edge 打开本页，用 USB 数据线连接 mini84。点击「连接键盘」，在浏览器授权窗口选择 mini84。关闭其他键盘配置工具。</p><p>当前适配 mini84EC(S) V2.3.3，USB 标识 0483:5235。其他型号、蓝牙和 2.4G 尚未适配。</p></div><div class="panel section-panel help-card"><h3>02 / 改键与组合键</h3><p>先选择配置层，再点击键帽。在右侧选择一个新功能，点击「应用此键」。开启组合模式后，可加入 Command / Win、Option / Alt 等修饰键。</p><p>页面上的修改会暂存在编辑器中，检查并确认写入后才会发送给键盘。关闭页面前请导出未写入的修改。</p><button class="text-button" id="record-shortcut">按下快捷键来录入</button></div><div class="panel section-panel help-card"><h3>03 / 写入与恢复</h3><p>写入前自动保存本地备份，并完整保留全部 9 层。写入后读取核对。写入期间请保持数据线连接。</p><p>如果写入中断，可能已有部分配置改变。重新读取键盘后，从「配置备份」恢复先前配置，再检查并写入。</p></div><div class="panel section-panel help-card"><h3>04 / 关于 QMK 与功能范围</h3><p>本工具借鉴 QMK / VIA 的可视化配置方式，通过 NiZ 原厂协议直接通信，使用原厂固件。它不是 QMK 固件，也不声明兼容 VIA 协议。</p><p>原生版和网页 WebHID 传输层均已完成实机原样回写，756 条定义读回一致。实际改键行为、宏播放和断电持久化仍待进一步测试。</p><p>静电容校准提供释放采样和自由按下采样。触发行程与 RT 已接入参数编辑及备份读回。刷固件与 RGB 控制尚未开放。</p></div><div class="panel section-panel help-card"><h3>05 / 数据留在你的浏览器</h3><p>键位、宏和按键计数都通过 USB 在浏览器与键盘之间传递，不上传到服务器。备份保存在当前浏览器，也可以下载为 JSON 文件。</p></div><div class="panel section-panel help-card"><h3>06 / 配置层编号</h3><p>读取确认设备共有 9 层。各层对应的用户配置组、左右 Fn 关系尚未完成实物核对，因此保留数字编号，不把未验证的层标成已确认的功能。</p><p>灯光与触发原始数据随完整备份保存；支持分别写入键位与触发参数，灯光仅备份。</p></div></div>`;
+  $('#view-help').innerHTML=`<div class="help-grid"><div class="panel section-panel help-card"><h3>01 / 连接与读取</h3><p>使用桌面版 Chrome 或 Edge 打开本页，用 USB 数据线连接 mini84v6pro。点击「连接键盘」，在浏览器授权窗口选择 mini84v6pro。关闭其他键盘配置工具。</p><p>当前适配 mini84EC(S) V2.3.3，USB 标识 0483:5235。其他型号、蓝牙和 2.4G 尚未适配。</p></div><div class="panel section-panel help-card"><h3>02 / 改键与组合键</h3><p>先选择配置层，再点击键帽。在右侧选择一个新功能，点击「应用此键」。开启组合模式后，可加入 Command / Win、Option / Alt 等修饰键。</p><p>页面上的修改会暂存在编辑器中，检查并确认写入后才会发送给键盘。关闭页面前请导出未写入的修改。</p><button class="text-button" id="record-shortcut">按下快捷键来录入</button></div><div class="panel section-panel help-card"><h3>03 / 写入与恢复</h3><p>写入前自动保存本地备份，并完整保留全部 9 层。写入后读取核对。写入期间请保持数据线连接。</p><p>如果写入中断，可能已有部分配置改变。重新读取键盘后，从「配置备份」恢复先前配置，再检查并写入。</p></div><div class="panel section-panel help-card"><h3>04 / 关于 QMK 与功能范围</h3><p>本工具借鉴 QMK / VIA 的可视化配置方式，通过 NiZ 原厂协议直接通信，使用原厂固件。它不是 QMK 固件，也不声明兼容 VIA 协议。</p><p>原生版和网页 WebHID 传输层均已完成实机原样回写，756 条定义读回一致。实际改键行为、宏播放和断电持久化仍待进一步测试。</p><p>静电容校准提供释放采样和自由按下采样。触发行程与 RT 已接入参数编辑及备份读回。刷固件与 RGB 控制尚未开放。</p></div><div class="panel section-panel help-card"><h3>05 / 数据留在你的浏览器</h3><p>键位、宏和按键计数都通过 USB 在浏览器与键盘之间传递，不上传到服务器。备份保存在当前浏览器，也可以下载为 JSON 文件。</p></div><div class="panel section-panel help-card"><h3>06 / 配置层编号</h3><p>读取确认设备共有 9 层。各层对应的用户配置组、左右 Fn 关系尚未完成实物核对，因此保留数字编号，不把未验证的层标成已确认的功能。</p><p>灯光与触发原始数据随完整备份保存；支持分别写入键位与触发参数，灯光仅备份。</p></div></div>`;
 }
 async function showView(view){
   if(state.view==='rt'&&view!=='rt')await state.channel?.stopTracking();
   state.view=view;document.body.dataset.view=view;
-  const titles={keymap:['自定义按键','自定义按键','选择键帽后编辑，或拖动功能到键盘。'],counters:['按键计数','按键计数','查看设备内保存的累计计数，重新读取后刷新。'],backups:['备份与恢复','备份与恢复','自动保存在浏览器，也可以导出到本机。'],rt:['触发行程与 RT','触发行程与 RT','选择物理按键，设置 NiZ 动态快速触发区间与阈值。'],calibration:['静电容校准','静电容校准','先释放采样，再按需采集任意 1～4 个键。'],parameters:['设备参数','设备参数','读取原厂参数，保留完整备份。当前仅提供查看。'],help:['使用帮助','使用帮助','连接、编辑、保存到键盘与恢复配置。']};
+  const titles={shortcuts:['组合键','组合键','查看原厂快捷操作，点击条目了解使用方法。'],keymap:['自定义按键','自定义按键','选择键帽后编辑，或拖动功能到键盘。'],counters:['按键计数','按键计数','查看设备内保存的累计计数，重新读取后刷新。'],backups:['备份与恢复','备份与恢复','自动保存在浏览器，也可以导出到本机。'],rt:['触发行程与 RT','触发行程与 RT','选择物理按键，设置 NiZ 动态快速触发区间与阈值。'],calibration:['静电容校准','静电容校准','先释放采样，再按需采集任意 1～4 个键。'],parameters:['设备参数','设备参数','读取原厂参数，保留完整备份。当前仅提供查看。'],help:['使用帮助','使用帮助','连接、编辑、保存到键盘与恢复配置。']};
   $('#page-name').textContent=titles[view][0];$('#main-title').textContent=titles[view][1];$('#subtitle').textContent=titles[view][2];
   $$('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
-  ['keymap','rt','counters','backups','calibration','parameters','help'].forEach(name=>$(`#view-${name}`).hidden=name!==view);
-  if(view==='rt')renderRT(state,renderControls,showDialog,escapeHTML,widths);if(view==='calibration')renderCalibration();if(view==='parameters')renderParameters();if(view==='counters')renderCounters();if(view==='help')renderHelp();if(view==='backups')await renderBackups();
+  ['keymap','rt','counters','backups','calibration','parameters','help','shortcuts'].forEach(name=>$(`#view-${name}`).hidden=name!==view);
+  if(view==='shortcuts')renderShortcuts(state,escapeHTML);if(view==='rt')renderRT(state,renderControls,showDialog,escapeHTML,widths);if(view==='calibration')renderCalibration();if(view==='parameters')renderParameters();if(view==='counters')renderCounters();if(view==='help')renderHelp();if(view==='backups')await renderBackups();
 }
 function render(){renderBoard();loadSelection();renderControls();if(state.view==='counters')renderCounters();}
 async function connect(){
-  if(!('hid' in navigator))return showDialog('请在 Chrome 或 Edge 中连接','<p>当前浏览器不提供 WebHID。请使用桌面版 Chrome 或 Edge 打开此网页，即可通过 USB 配置 mini84。离线编辑、导入与导出仍可使用。</p>');
+  if(!('hid' in navigator))return showDialog('请在 Chrome 或 Edge 中连接','<p>当前浏览器不提供 WebHID。请使用桌面版 Chrome 或 Edge 打开此网页，即可通过 USB 配置 mini84v6pro。离线编辑、导入与导出仍可使用。</p>');
   if(hasChanges())return showDialog('先保存页面中的修改？','<p>连接并读取键盘会替换当前编辑内容。请先导出配置，或选择继续读取。</p>',()=>{state.snapshot=structuredClone(state.baseline);connect();},'继续连接并读取');
   await run(async()=>{
     const [device]=await navigator.hid.requestDevice({filters:[{vendorId:MODEL.vendorId,productId:MODEL.productId,usagePage:MODEL.usagePage}]});
@@ -185,7 +187,7 @@ function recordShortcut(){
   };
 }
 $('#record-current').onclick=recordShortcut;
-$('#device-connect').onclick=()=>state.channel?toast('mini84 已连接。'):connect();
+$('#device-connect').onclick=()=>state.channel?toast('mini84v6pro 已连接。'):connect();
 $$('[data-rail]').forEach(button=>button.onclick=()=>showView(button.dataset.rail));
 $('#macro-nav').onclick=()=>{showView('keymap');state.definition.kind=2;renderEditor();$('.editor').scrollIntoView({behavior:'smooth',block:'start'});};
 $('#palette').ondragstart=event=>{const button=event.target.closest('[data-code]');if(!button)return;event.dataTransfer.setData('application/x-niz-code',button.dataset.code);event.dataTransfer.effectAllowed='copy';};
@@ -216,9 +218,9 @@ $('#apply-key').onclick=()=>{
 };
 $('#revert-key').onclick=()=>{const index=(state.layer-1)*84+state.key-1;state.snapshot.mappings[index]=structuredClone(state.baseline.mappings[index]);render();toast('已撤销这个键的修改。');};
 $('#undo-all').onclick=()=>showDialog('撤销全部修改？','<p>页面将恢复为上次读取或加载的配置，键盘内的配置不会改变。</p>',()=>{state.snapshot=structuredClone(state.baseline);render();toast('已撤销全部修改。');},'撤销全部');
-$('#export').onclick=()=>{download(state.snapshot,state.mode==='demo'?'NiZ-demo':'NiZ-mini84');toast('配置已导出。');};
+$('#export').onclick=()=>{download(state.snapshot,state.mode==='demo'?'NiZ-demo':'NiZ-mini84v6pro');toast('配置已导出。');};
 $('#review').onclick=review;
-$('#layer-help').onclick=()=>showDialog('配置层 1–9','<p>这把 mini84 的原厂固件返回 9 层、756 条按键定义。各层与用户配置组、左右 Fn 的对应关系还在核对，因此目前保留原始编号。</p><p>每次写入都完整保留 9 层；编辑当前层不会自动复制到其他层。</p>');
+$('#layer-help').onclick=()=>showDialog('配置层 1–9','<p>这把 mini84v6pro 的原厂固件返回 9 层、756 条按键定义。各层与用户配置组、左右 Fn 的对应关系还在核对，因此目前保留原始编号。</p><p>每次写入都完整保留 9 层；编辑当前层不会自动复制到其他层。</p>');
 $$('.nav-item[data-view]').forEach(button=>button.onclick=()=>showView(button.dataset.view).catch(error=>showDialog('无法打开此页',`<p>${escapeHTML(error.message)}</p>`)));
 $('#view-backups').onclick=event=>{
   if(event.target.closest('#import-button'))$('#import-file').click();

@@ -4,7 +4,7 @@ import {triggerPackets} from './rt.js';
 const pause = ms=>new Promise(resolve=>setTimeout(resolve,ms));
 export class NiZDevice {
   constructor(device) {
-    assert(device.vendorId===MODEL.vendorId&&device.productId===MODEL.productId&&device.collections.some(c=>c.usagePage===MODEL.usagePage&&c.outputReports.some(r=>r.reportId===0&&r.items.reduce((bits,item)=>bits+item.reportSize*item.reportCount,0)===512)), '所选设备没有受支持的 mini84 配置接口。');
+    assert(device.vendorId===MODEL.vendorId&&device.productId===MODEL.productId&&device.collections.some(c=>c.usagePage===MODEL.usagePage&&c.outputReports.some(r=>r.reportId===0&&r.items.reduce((bits,item)=>bits+item.reportSize*item.reportCount,0)===512)), '所选设备没有受支持的 mini84v6pro 配置接口。');
     this.device=device;
     this.pending=null;
     this.tracking=null;

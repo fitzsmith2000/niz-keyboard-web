@@ -3,13 +3,13 @@ import {chooseTravel} from './tracking.js';
 import {ROWS,DEFAULT_CODES,assert,command} from './protocol.js';
 import {keyName} from './keycodes.js';
 
-// NiZ 1.0.8 mini84 limits; threshold is an index into 0.1–0.7 mm.
+// NiZ 1.0.8 mini84v6pro limits; threshold is an index into 0.1–0.7 mm.
 export function triggerPackets(target,baseline){
   assert(Array.isArray(target)&&target.length===252&&target.every(n=>Number.isInteger(n)&&n>=0&&n<=255),'触发配置必须包含 252 个字节。');
   target.filter((_,i)=>i%3===0).forEach((_,key)=>{
     const [upper,lower,threshold]=target.slice(key*3,key*3+3);
     if(baseline&&target.slice(key*3,key*3+3).every((n,i)=>n===baseline[key*3+i]))return;
-    assert(upper>=6&&upper<=34&&lower>=8&&lower<=36&&upper<lower&&threshold<=6,`按键 ${key+1} 的触发参数超出 mini84 原厂范围。`);
+    assert(upper>=6&&upper<=34&&lower>=8&&lower<=36&&upper<lower&&threshold<=6,`按键 ${key+1} 的触发参数超出 mini84v6pro 原厂范围。`);
   });
   return [command(0xd2),...Array.from({length:Math.ceil(target.length/61)},(_,i)=>command(0xd4,[target.slice(i*61,i*61+61).length,...target.slice(i*61,i*61+61)])),[0,...Array(63).fill(0xd1)]];
 }
