@@ -1,3 +1,4 @@
+import {triggerPackets} from '../dist/rt.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
@@ -62,6 +63,9 @@ class FakeHID extends EventTarget {
     if(p[1]===0xe3){const bytes=new Uint8Array(336),view=new DataView(bytes.buffer);this.profile.counters.forEach((n,i)=>view.setUint32(i*4,n,true));reply=this.blob(0xe3,Array.from(bytes),0xe6);}
     if(p[1]===0xdb)reply=[command(0xda,[0xda])];
     if(p[1]===0xdd)reply=[command(0xde,[0xde])];
+    if(p[1]===0xd2)this.triggerWriting=[];
+    if(p[1]===0xd4)this.triggerWriting.push(...p.slice(3,3+p[2]));
+    if(p[1]===0xd1)this.profile.triggers=this.triggerWriting;
     if(p[1]===0xf1)this.writing=[];
     if(p[1]===0xf0)this.writing.push(p);
     if(p[1]===0xf6)this.profile.mappings=parseReports(this.writing);
@@ -141,4 +145,43 @@ test('per-step delays match native C8 markers across packet boundaries and retai
   assert.throws(()=>encode(1,1,{kind:2,codes:[43,44],customDelay:1,delays:[]}),/延时/);
   assert.throws(()=>encode(1,1,{kind:2,codes:[43,44],customDelay:1,delays:[65536]}),/延时/);
   assert.equal(decode(encode(1,1,{kind:2,codes:[43],customDelay:1,delays:[]})).codes.length,1);
+});
+
+test('NiZ trigger writer uses D2, five D4 chunks and full D1 terminator',()=>{
+  const base=demoSnapshot().triggers,target=[...base];target.splice(0,3,16,24,4);
+  const packets=triggerPackets(target,base);
+  assert.equal(packets.length,7);assert.equal(packets[0][1],0xd2);
+  assert.deepEqual(packets[1].slice(0,6),[0,0xd4,61,16,24,4]);
+  assert.equal(packets[5][2],8);assert.deepEqual(packets.at(-1),[0,...Array(63).fill(0xd1)]);
+  assert.deepEqual(packets.slice(1,-1).flatMap(p=>p.slice(3,3+p[2])),target);
+  for(const invalid of [[5,24,4],[16,37,4],[24,16,4],[16,24,7]])assert.throws(()=>triggerPackets([...invalid,...base.slice(3)],base),/范围/);
+  assert.throws(()=>triggerPackets([1],base),/252/);
+});
+test('trigger-only save backs up, preserves 756 mappings and verifies all data',async()=>{
+  const device=new FakeHID(),channel=new NiZDevice(device);await channel.open();const base=await channel.snapshot(),target=structuredClone(base);target.triggers.splice(0,3,16,24,4);
+  const after=await channel.write(target,base,async(current)=>{assert.deepEqual(current.triggers,base.triggers);assert.equal(device.sent.some(p=>p[1]===0xd2),false);});
+  assert.deepEqual(after.triggers,target.triggers);assert.deepEqual(after.mappings,base.mappings);assert.equal(device.sent.some(p=>p[1]===0xf1),false);await channel.close();
+});
+test('invalid trigger values, backup failure and external trigger edits cannot start writing',async()=>{
+  const device=new FakeHID(),channel=new NiZDevice(device);await channel.open();const base=await channel.snapshot(),target=structuredClone(base);target.triggers[0]=5;
+  await assert.rejects(()=>channel.write(target,base,async()=>{}),/范围/);
+  target.triggers.splice(0,3,16,24,4);
+  await assert.rejects(()=>channel.write(target,base,async()=>{throw Error('backup failed');}),/backup failed/);
+  device.profile.triggers[0]=10;await assert.rejects(()=>channel.write(target,base,async()=>{}),/配置已变化/);
+  assert.equal(device.sent.some(p=>p[1]===0xd2||p[1]===0xf1),false);await channel.close();
+});
+test('failed trigger write reports partial-update risk and mismatched readback is rejected',async()=>{
+  const device=new FakeHID(),channel=new NiZDevice(device);await channel.open();const base=await channel.snapshot(),target=structuredClone(base);target.triggers.splice(0,3,16,24,4);
+  const send=device.sendReport.bind(device);device.sendReport=async(id,p)=>{if(p[1]===0xd4)throw Error('USB failed');return send(id,p);};
+  await assert.rejects(()=>channel.write(target,base,async()=>{}),/可能已更新部分配置/);
+  device.sendReport=async(id,p)=>{await send(id,p);if(p[1]===0xd1)device.profile.triggers[0]=10;};
+  await assert.rejects(()=>channel.write(target,base,async()=>{}),/读回配置与预期不一致/);await channel.close();
+});
+
+test('combined keymap and RT save commits both areas and preserves lights',async()=>{
+  const device=new FakeHID(),channel=new NiZDevice(device);await channel.open();const base=await channel.snapshot(),target=structuredClone(base);
+  target.mappings[0]=encode(1,1,{kind:0,codes:[43]});target.triggers.splice(0,3,16,24,4);
+  const after=await channel.write(target,base,async()=>{});
+  assert.deepEqual(after.mappings,target.mappings);assert.deepEqual(after.triggers,target.triggers);assert.deepEqual(after.lights,base.lights);
+  assert.ok(device.sent.findIndex(p=>p[1]===0xf6)<device.sent.findIndex(p=>p[1]===0xd2));await channel.close();
 });

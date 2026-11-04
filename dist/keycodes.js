@@ -148,7 +148,7 @@ export const KEY_NAMES = {
   "146": "Sunset or Relax/Aurora",
   "147": "Color Breathe",
   "148": "Back Color Exchange",
-  "149": "Adjust Trigger Point",
+  "149": "固定触发行程切换",
   "150": "Keyboard Lock",
   "151": "Shift&Up",
   "152": "Ctrl&Caps Exchange",

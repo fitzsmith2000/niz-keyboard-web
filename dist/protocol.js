@@ -84,5 +84,5 @@ export function parseBlob(reports,op,length) {
 export function demoSnapshot() {
   return {schema:1,capturedAt:new Date().toISOString(),vendorID:MODEL.vendorId,productID:MODEL.productId,locationID:0,version:'mini84EC(S);V2.3.3;V1.0;',
     mappings:Array.from({length:756},(_,i)=>encode(Math.floor(i/84)+1,i%84+1,{kind:0,codes:Math.floor(i/84)%3===0?[DEFAULT_CODES[i%84]]:[]})),
-    lights:Array(252).fill(0),triggers:Array(252).fill(0),counters:Array(84).fill(0)};
+    lights:Array(252).fill(0),triggers:Array.from({length:252},(_,i)=>[8,35,2][i%3]),counters:Array(84).fill(0)};
 }

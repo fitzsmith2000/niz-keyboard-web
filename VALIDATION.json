@@ -46,7 +46,7 @@
     }
   },
   "protocolTests": {
-    "passed": 17,
+    "passed": 22,
     "failed": 0
   },
   "reference": {
@@ -90,5 +90,25 @@
     "macroPlaybackTypePreserved": true,
     "browserMacroTest": "PASS; tests/browser_macro.py",
     "hardwareCommandsSent": false
+  },
+  "rt": {
+    "source": "NiZ 1.0.8 EXE display tables and DLL writeKeyTriggerToDev; RT_PROTOCOL.md",
+    "hardwareTested": false,
+    "firmware": "mini84EC(S) V2.3.3 standard only",
+    "browser": "PASS; tests/browser_rt.py; simulated HID only",
+    "checks": [
+      "perKeyAndMultiSelect",
+      "wasdSelect",
+      "demoWriteBlocked",
+      "backupBeforeWrite",
+      "triggerOnlyWrite",
+      "full84Readback",
+      "keymapPreserved",
+      "invalidValuesBlocked",
+      "externalChangeBlocked",
+      "failureReported",
+      "responsive"
+    ],
+    "competitionFirmwareFlashed": false
   }
 }

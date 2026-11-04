@@ -1,4 +1,5 @@
 import {MODEL,assert,command,parseReports,parseBlob,equal} from './protocol.js';
+import {triggerPackets} from './rt.js';
 const pause = ms=>new Promise(resolve=>setTimeout(resolve,ms));
 export class NiZDevice {
   constructor(device) {
@@ -89,23 +90,33 @@ export class NiZDevice {
   }
   async write(target,baseline,saveBackup,progress=()=>{}) {
     assert(!this.calibrationActive,'校准期间不能写入按键配置。');
+    const triggerChanged=!equal(target.triggers,baseline.triggers);
+    const triggerReports=triggerChanged?triggerPackets(target.triggers,baseline.triggers):[];
+    const keyChanged=!equal(target.mappings,baseline.mappings);
     let began=false;
     try {
       const current=await this.snapshot((phase,ratio)=>progress(`写入前检查 · ${phase}`,ratio*0.3));
-      assert(current.version===baseline.version&&equal(current.mappings,baseline.mappings),'键盘配置已变化，请重新读取后再编辑。');
+      assert(current.version===baseline.version&&equal(current.mappings,baseline.mappings)&&equal(current.triggers,baseline.triggers),'键盘配置已变化，请重新读取后再编辑。');
       await saveBackup(current,'写入前');
-      const reports=target.mappings.flatMap(m=>m.packets);
-      progress('正在写入',0.32);
-      await this.device.sendReport(0,new Uint8Array(command(0xf1))); began=true;
-      for(let i=0;i<reports.length;i++) {
-        await this.device.sendReport(0,new Uint8Array(reports[i]));
-        if(i%20===0) progress(`正在写入 · ${i+1}/${reports.length}`,0.32+0.38*(i+1)/reports.length);
-        await pause(3);
+      if(keyChanged){
+        const reports=target.mappings.flatMap(m=>m.packets);
+        progress('正在写入',0.32);
+        await this.device.sendReport(0,new Uint8Array(command(0xf1))); began=true;
+        for(let i=0;i<reports.length;i++) {
+          await this.device.sendReport(0,new Uint8Array(reports[i]));
+          if(i%20===0) progress(`正在写入 · ${i+1}/${reports.length}`,0.32+0.38*(i+1)/reports.length);
+          await pause(3);
+        }
+        await this.device.sendReport(0,new Uint8Array([0,...Array(63).fill(0xf6)]));
+        if(triggerChanged)await pause(600);
       }
-      await this.device.sendReport(0,new Uint8Array([0,...Array(63).fill(0xf6)]));
+      if(triggerChanged){
+        progress('正在写入触发参数',0.65);
+        for(const packet of triggerReports){began=true;await this.device.sendReport(0,new Uint8Array(packet));await pause(3);}
+      }
       await pause(600);
       const after=await this.snapshot((phase,ratio)=>progress(`读回核对 · ${phase}`,0.72+ratio*0.27));
-      assert(equal(after.mappings,target.mappings)&&equal(after.triggers,current.triggers)&&equal(after.lights,current.lights),'读回配置与预期不一致，请重新读取并检查；写入前备份已保存。');
+      assert(equal(after.mappings,target.mappings)&&equal(after.triggers,target.triggers)&&equal(after.lights,current.lights),'读回配置与预期不一致，请重新读取并检查；写入前备份已保存。');
       return after;
     } catch(error) {
       if(began) throw new Error(`写入未完成或核对未通过，键盘可能已更新部分配置。写入前备份已保存在「备份」中。${error.message}`,{cause:error});
