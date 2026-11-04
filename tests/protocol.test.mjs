@@ -129,3 +129,16 @@ test('closing during capture cancels the receiver and attempts keyboard unlock',
   await new Promise(resolve=>setTimeout(resolve,100));await channel.close();await rejected;
   assert.equal(device.opened,false);assert.deepEqual(device.sent.at(-1).slice(0,4),[0,0xd9,1,0]);
 });
+
+test('per-step delays match native C8 markers across packet boundaries and retain playback type',()=>{
+  const codes=Array.from({length:60},(_,i)=>i+1),delays=Array.from({length:59},(_,i)=>i*257);
+  const mapping=encode(2,7,{kind:2,codes,customDelay:1,delays,cycles:3,interval:30});
+  assert.deepEqual(mapping.packets[0].slice(0,15),[0,240,2,7,2,3,1,0,30,0,237,1,200,0,0]);
+  assert.equal(mapping.packets.length,5);
+  assert.deepEqual(decode(mapping).codes,codes);assert.deepEqual(decode(mapping).delays,delays);
+  const profile=demoSnapshot();profile.mappings[90]=mapping;assert.deepEqual(validateSnapshot(profile).mappings[90],mapping);
+  for(const kind of [3,4]){const retained=encode(2,7,{kind,codes,customDelay:1,delays,cycles:0});assert.equal(decode(retained).kind,kind);assert.equal(decode(retained).cycles,0);}
+  assert.throws(()=>encode(1,1,{kind:2,codes:[43,44],customDelay:1,delays:[]}),/延时/);
+  assert.throws(()=>encode(1,1,{kind:2,codes:[43,44],customDelay:1,delays:[65536]}),/延时/);
+  assert.equal(decode(encode(1,1,{kind:2,codes:[43],customDelay:1,delays:[]})).codes.length,1);
+});

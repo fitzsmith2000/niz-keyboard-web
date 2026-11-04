@@ -20,8 +20,8 @@ export function decode(mapping) {
 }
 export function encode(layer, key, definition) {
   assert(Number.isInteger(layer)&&layer>=1&&layer<=9&&Number.isInteger(key)&&key>=1&&key<=84, '键位或层编号无效。');
-  const {kind,codes,interval=30,cycles=1} = definition;
-  assert([0,1,2].includes(kind) && Array.isArray(codes) && codes.every(byte), '功能定义无效。');
+  const {kind,codes,interval=30,cycles=1,customDelay=0,delays=[]} = definition;
+  assert([0,1,2,3,4].includes(kind) && Array.isArray(codes) && codes.every(byte), '功能定义无效。');
   if (kind===0) {
     assert(codes.length<=58,'组合键超过设备容量。');
     return {packets:[command(0xf0,[layer,key,0,codes.length,...codes])]};
@@ -29,10 +29,14 @@ export function encode(layer, key, definition) {
   assert(Number.isInteger(interval)&&interval>=(kind===1?1:0)&&interval<=65535,'间隔必须在有效范围内。');
   assert(codes.length>0&&codes.length<=(kind===1?56:2048),'动作数量超过设备容量，或动作序列为空。');
   if (kind===1) return {packets:[command(0xf0,[layer,key,1,interval>>8,interval&255,codes.length,...codes])]};
-  assert(Number.isInteger(cycles)&&cycles>=1&&cycles<=255,'循环次数必须为 1–255。');
-  const header = command(0xf0,[layer,key,2,cycles,0,interval>>8,interval&255,codes.length>>8,codes.length&255]);
-  return {packets:Array.from({length:Math.ceil(codes.length/53)},(_,i)=>{
-    const packet=[...header]; packet.splice(11,Math.min(53,codes.length-i*53),...codes.slice(i*53,i*53+53)); return packet;
+  assert(Number.isInteger(cycles)&&cycles>=(kind===2?1:0)&&cycles<=255,'循环次数必须为 1–255。');
+  assert(customDelay===0||customDelay===1,'延时模式无效。');
+  assert(customDelay===0||(Array.isArray(delays)&&delays.length===codes.length-1&&delays.every(n=>Number.isInteger(n)&&n>=0&&n<=65535)),'每两个动作之间需设置 0–65535 的延时。');
+  const payload=customDelay===0?codes:codes.flatMap((code,i)=>i===codes.length-1?[code]:[code,200,delays[i]>>8,delays[i]&255]);
+  assert(payload.length<=8192,'宏数据超过设备容量。');
+  const header = command(0xf0,[layer,key,kind,cycles,customDelay,interval>>8,interval&255,payload.length>>8,payload.length&255]);
+  return {packets:Array.from({length:Math.ceil(payload.length/53)},(_,i)=>{
+    const packet=[...header]; packet.splice(11,Math.min(53,payload.length-i*53),...payload.slice(i*53,i*53+53)); return packet;
   })};
 }
 export function parseReports(reports) {

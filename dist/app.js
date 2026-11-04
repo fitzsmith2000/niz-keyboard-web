@@ -70,9 +70,9 @@ function renderPalette(){
   const search=state.search.trim().toLowerCase();
   const aliases={1:'escape esc 退出',27:'backspace 退格',42:'caps lock 大写',54:'enter return 回车',55:'shift 左',66:'shift 右',67:'control ctrl 左',68:'command cmd win meta 左',69:'option alt 左',71:'option alt 右',72:'command cmd win meta 右',74:'control ctrl 右',111:'play pause 播放 暂停',112:'mute volume 静音 音量',113:'volume up 音量',114:'volume down 音量'};
   const basic=[...Array.from({length:26},(_,i)=>DEFAULT_CODES.find(code=>keyName(code)===String.fromCharCode(65+i))).filter(code=>code!==undefined),...Array.from({length:10},(_,i)=>i+15),25,26,39,40,41,52,53,14,63,64,65,1,27,28,42,54,70,84,82,85,83,86,87,88,89,90,...Array.from({length:12},(_,i)=>i+2)];
-  const codes=search||state.category==='all'?Object.keys(KEY_NAMES).map(Number).filter(code=>code!==0):state.category==='basic'?basic:state.category==='modifier'?[67,68,69,55,74,72,71,66,156,166]:Array.from({length:18},(_,i)=>108+i);
+  const codes=search||state.category==='all'?Object.keys(KEY_NAMES).map(Number).filter(code=>code!==0):state.category==='basic'?basic:state.category==='modifier'?[67,68,69,55,74,72,71,66,156,166]:state.category==='mouse'?[...Array.from({length:9},(_,i)=>126+i),199]:Array.from({length:18},(_,i)=>108+i);
   const results=codes.filter(code=>!search||`${keyName(code)} ${aliases[code]??''} ${code}`.toLowerCase().includes(search));
-  $('#palette-title').textContent=search?'搜索结果':({basic:'基本字符',modifier:'修饰键与 Fn',media:'媒体及音频控制',all:'全部功能'}[state.category]);
+  $('#palette-title').textContent=search?'搜索结果':({basic:'基本字符',modifier:'修饰键与 Fn',media:'媒体及音频控制',mouse:'鼠标功能',all:'全部功能'}[state.category]);
   $('#palette').innerHTML=results.length?results.map(code=>`<button draggable="true" data-code="${code}" title="${escapeHTML(keyName(code))}" aria-label="选择功能 ${escapeHTML(keyName(code))}">${escapeHTML(shortName(code))}</button>`).join(''):'<span class="palette-empty">没有匹配的功能。</span>';
 }
 function renderEditor(){
@@ -86,9 +86,13 @@ function renderEditor(){
   $('#add-mode').textContent=d.kind>=2?'＋ 按顺序加入动作':state.append?'✓ 组合模式已开启':'＋ 组合多个键';
   $('#add-mode').setAttribute('aria-pressed',state.append);
   $('#add-mode').disabled=d.kind>=2;
-  $('#timing').hidden=d.kind===0;$('#cycles-field').hidden=d.kind<2;
+  $('#macro-options').hidden=d.kind<2;
+  $('#macro-custom-delay').checked=d.customDelay===1;
+  $('#macro-steps').innerHTML=d.kind>=2&&d.customDelay===1?d.codes.map((code,i)=>`<div class="macro-step"><span>${i+1}. ${escapeHTML(keyName(code))}</span>${i<d.codes.length-1?`<input type="number" data-step-delay="${i}" aria-label="第 ${i+1} 步后延时" min="0" max="65535" value="${d.delays?.[i]??d.interval}">`:'<small>结束</small>'}</div>`).join(''):'';
+  $('#interval').disabled=d.kind>=2&&d.customDelay===1;
+  $('#timing').hidden=d.kind===0;$('#cycles-field').hidden=d.kind!==2;
   $('#interval').min=d.kind===1?'1':'0';$('#interval').value=d.interval;$('#cycles').value=Math.max(1,d.cycles);
-  $('#editor-note').textContent=d.kind>=2?'按顺序选择动作，可设置固定间隔和循环次数。编辑现有复杂宏会转换为固定间隔宏；未编辑的宏完整保留。':d.kind===1?'连发间隔使用原厂协议数值。此设备上的连发实际行为尚待验证。':'选择功能后点击应用。组合键可加入 ⌘、⌥、Shift 等修饰键。';
+  $('#editor-note').textContent=d.kind>=2?'按顺序加入键盘或鼠标动作，可选择统一间隔或逐步延时。延时沿用原厂数值；已有宏保留播放模式。':d.kind===1?'连发间隔使用原厂协议数值。此设备上的连发实际行为尚待验证。':'选择功能后点击应用。组合键可加入 ⌘、⌥、Shift 等修饰键。';
   renderPalette();
 }
 async function renderBackups(){
@@ -191,16 +195,18 @@ $('#read').onclick=read;
 $('#layers').onclick=event=>{const button=event.target.closest('[data-layer]');if(!button)return;state.layer=Number(button.dataset.layer);render();};
 $('#keyboard').onclick=event=>{const button=event.target.closest('[data-key]');if(!button)return;state.key=Number(button.dataset.key);renderBoard();loadSelection();};
 $('#palette').onclick=event=>{const button=event.target.closest('[data-code]');if(!button)return;const code=Number(button.dataset.code);state.definition.codes=state.append||state.definition.kind>=2?[...state.definition.codes,code]:[code];renderEditor();};
-$('#combo').onclick=event=>{const button=event.target.closest('[data-remove]');if(button){state.definition.codes=state.definition.codes.filter((_,i)=>i!==Number(button.dataset.remove));renderEditor();}};
+$('#combo').onclick=event=>{const button=event.target.closest('[data-remove]');if(button){state.definition.codes=state.definition.codes.filter((_,i)=>i!==Number(button.dataset.remove));state.definition.delays=state.definition.delays?.filter((_,i)=>i!==Number(button.dataset.remove)).slice(0,Math.max(0,state.definition.codes.length-1));renderEditor();}};
 $('#function-search').oninput=event=>{state.search=event.target.value;renderPalette();};
 $$('[data-category]').forEach(button=>button.onclick=()=>{state.category=button.dataset.category;$$('[data-category]').forEach(b=>b.classList.toggle('active',b===button));renderPalette();});
-$$('[data-kind]').forEach(button=>button.onclick=()=>{state.definition.kind=Number(button.dataset.kind);if(state.definition.kind===1&&state.definition.interval<1)state.definition.interval=30;renderEditor();});
+$$('[data-kind]').forEach(button=>button.onclick=()=>{state.definition.kind=Number(button.dataset.kind)===2&&state.definition.kind>=2?state.definition.kind:Number(button.dataset.kind);if(state.definition.kind===1&&state.definition.interval<1)state.definition.interval=30;renderEditor();});
 $('#add-mode').onclick=()=>{state.append=!state.append;renderEditor();};
 $('#clear-codes').onclick=()=>{state.definition.codes=[];renderEditor();};
+$('#macro-custom-delay').onchange=event=>{state.definition.customDelay=event.target.checked?1:0;renderEditor();};
+$('#macro-steps').onchange=event=>{if(!event.target.matches('[data-step-delay]'))return;state.definition.delays=state.definition.codes.slice(1).map((_,i)=>state.definition.delays?.[i]??state.definition.interval);state.definition.delays[Number(event.target.dataset.stepDelay)]=Number(event.target.value);};
 $('#interval').onchange=event=>state.definition.interval=Number(event.target.value);
 $('#cycles').onchange=event=>state.definition.cycles=Number(event.target.value);
 $('#apply-key').onclick=()=>{
-  const result=(()=>{try{return encode(state.layer,state.key,{...state.definition,kind:Math.min(state.definition.kind,2)});}catch(error){showDialog('无法应用此键',`<p>${escapeHTML(error.message)}</p>`);return null;}})();
+  const result=(()=>{try{return encode(state.layer,state.key,{...state.definition,delays:state.definition.codes.slice(1).map((_,i)=>state.definition.delays?.[i]??state.definition.interval)});}catch(error){showDialog('无法应用此键',`<p>${escapeHTML(error.message)}</p>`);return null;}})();
   if(!result)return;state.snapshot.mappings[(state.layer-1)*84+state.key-1]=result;renderBoard();renderControls();$('#selected-current').textContent=summary(selected());toast('已应用到页面，尚未写入键盘。');
 };
 $('#revert-key').onclick=()=>{const index=(state.layer-1)*84+state.key-1;state.snapshot.mappings[index]=structuredClone(state.baseline.mappings[index]);render();toast('已撤销这个键的修改。');};

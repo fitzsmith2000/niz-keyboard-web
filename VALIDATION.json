@@ -46,7 +46,7 @@
     }
   },
   "protocolTests": {
-    "passed": 16,
+    "passed": 17,
     "failed": 0
   },
   "reference": {
@@ -81,5 +81,14 @@
     "limitation": "No release or held-key calibration request sent to physical hardware; physical sampling and key behavior remain unverified.",
     "mode": "Linear single-stage flow with user-chosen 1–4 held keys; no fixed groups or minimum capture count",
     "simulatedPressSamples": 23
+  },
+  "featureParityAudit": {
+    "source": "Supplied Windows 1.0.8 executable strings and NiZKBHWI.dll disassembly",
+    "report": "FEATURE_PARITY.md",
+    "fullReplacement": false,
+    "stepDelayEncoding": true,
+    "macroPlaybackTypePreserved": true,
+    "browserMacroTest": "PASS; tests/browser_macro.py",
+    "hardwareCommandsSent": false
   }
 }
