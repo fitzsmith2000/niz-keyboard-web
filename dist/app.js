@@ -1,3 +1,4 @@
+import {renderFeedback} from './feedback.js';
 import {renderShortcuts} from './shortcuts.js';
 import {renderRT,resetTravel} from './rt.js';
 import {MODEL,DEFAULT_CODES,ROWS,assert,recordId,decode,encode,equal,validateSnapshot,demoSnapshot} from './protocol.js';
@@ -129,14 +130,18 @@ function renderParameters(){
 }
 function renderHelp(){
   $('#view-help').innerHTML=`<div class="help-grid"><div class="panel section-panel help-card"><h3>01 / 连接与读取</h3><p>使用桌面版 Chrome 或 Edge 打开本页，用 USB 数据线连接 mini84v6pro。点击「连接键盘」，在浏览器授权窗口选择 mini84v6pro。关闭其他键盘配置工具。</p><p>当前适配 mini84EC(S) V2.3.3，USB 标识 0483:5235。其他型号、蓝牙和 2.4G 尚未适配。</p></div><div class="panel section-panel help-card"><h3>02 / 改键与组合键</h3><p>先选择配置层，再点击键帽。在右侧选择一个新功能，点击「应用此键」。开启组合模式后，可加入 Command / Win、Option / Alt 等修饰键。</p><p>页面上的修改会暂存在编辑器中，检查并确认写入后才会发送给键盘。关闭页面前请导出未写入的修改。</p><button class="text-button" id="record-shortcut">按下快捷键来录入</button></div><div class="panel section-panel help-card"><h3>03 / 写入与恢复</h3><p>写入前自动保存本地备份，并完整保留全部 9 层。写入后读取核对。写入期间请保持数据线连接。</p><p>如果写入中断，可能已有部分配置改变。重新读取键盘后，从「配置备份」恢复先前配置，再检查并写入。</p></div><div class="panel section-panel help-card"><h3>04 / 关于 QMK 与功能范围</h3><p>本工具借鉴 QMK / VIA 的可视化配置方式，通过 NiZ 原厂协议直接通信，使用原厂固件。它不是 QMK 固件，也不声明兼容 VIA 协议。</p><p>原生版和网页 WebHID 传输层均已完成实机原样回写，756 条定义读回一致。实际改键行为、宏播放和断电持久化仍待进一步测试。</p><p>静电容校准提供释放采样和自由按下采样。触发行程与 RT 已接入参数编辑及备份读回。刷固件与 RGB 控制尚未开放。</p></div><div class="panel section-panel help-card"><h3>05 / 数据留在你的浏览器</h3><p>键位、宏和按键计数都通过 USB 在浏览器与键盘之间传递，不上传到服务器。备份保存在当前浏览器，也可以下载为 JSON 文件。</p></div><div class="panel section-panel help-card"><h3>06 / 配置层编号</h3><p>读取确认设备共有 9 层。各层对应的用户配置组、左右 Fn 关系尚未完成实物核对，因此保留数字编号，不把未验证的层标成已确认的功能。</p><p>灯光与触发原始数据随完整备份保存；支持分别写入键位与触发参数，灯光仅备份。</p></div></div>`;
+  $('#view-help').insertAdjacentHTML('afterbegin','<section class="panel section-panel" id="feedback-form"></section>');
+  renderFeedback(state,escapeHTML);
 }
 async function showView(view){
   if(state.view==='rt'&&view!=='rt')await state.channel?.stopTracking();
   state.view=view;document.body.dataset.view=view;
-  const titles={shortcuts:['组合键','组合键','查看原厂快捷操作，点击条目了解使用方法。'],keymap:['自定义按键','自定义按键','选择键帽后编辑，或拖动功能到键盘。'],counters:['按键计数','按键计数','查看设备内保存的累计计数，重新读取后刷新。'],backups:['备份与恢复','备份与恢复','自动保存在浏览器，也可以导出到本机。'],rt:['触发行程与 RT','触发行程与 RT','选择物理按键，设置 NiZ 动态快速触发区间与阈值。'],calibration:['静电容校准','静电容校准','先释放采样，再按需采集任意 1～4 个键。'],parameters:['设备参数','设备参数','读取原厂参数，保留完整备份。当前仅提供查看。'],help:['使用帮助','使用帮助','连接、编辑、保存到键盘与恢复配置。']};
+  const titles={settings:['设置','设置','查看设备信息，管理本机配置与备份。'],shortcuts:['组合键','组合键','查看原厂快捷操作，点击条目了解使用方法。'],keymap:['自定义按键','自定义按键','选择键帽后编辑，或拖动功能到键盘。'],counters:['按键计数','按键计数','查看设备内保存的累计计数，重新读取后刷新。'],backups:['备份与恢复','备份与恢复','自动保存在浏览器，也可以导出到本机。'],rt:['触发行程与 RT','触发行程与 RT','选择物理按键，设置 NiZ 动态快速触发区间与阈值。'],calibration:['静电容校准','静电容校准','先释放采样，再按需采集任意 1～4 个键。'],parameters:['设备参数','设备参数','读取原厂参数，保留完整备份。当前仅提供查看。'],help:['使用帮助','使用帮助','连接、编辑、保存到键盘与恢复配置。']};
   $('#page-name').textContent=titles[view][0];$('#main-title').textContent=titles[view][1];$('#subtitle').textContent=titles[view][2];
   $$('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
-  ['keymap','rt','counters','backups','calibration','parameters','help','shortcuts'].forEach(name=>$(`#view-${name}`).hidden=name!==view);
+  ['keymap','rt','counters','backups','calibration','parameters','help','shortcuts','settings'].forEach(name=>$(`#view-${name}`).hidden=name!==view);
+  $$('[data-rail]').forEach(button=>button.classList.toggle('active',button.dataset.rail===(view==='help'?'help':['settings','parameters','backups'].includes(view)?'settings':'keymap')));
+  if(view==='settings')$('#view-settings').innerHTML=`<div class="help-grid"><article class="panel section-panel"><h2>设备参数</h2><p>查看触发参数、固件标识和 USB 信息。</p><button class="button" data-settings-view="parameters">查看设备参数</button></article><article class="panel section-panel"><h2>备份与恢复</h2><p>管理本机备份，导入或导出 JSON 配置。</p><button class="button" data-settings-view="backups">管理配置备份</button></article></div>`;
   if(view==='shortcuts')renderShortcuts(state,escapeHTML);if(view==='rt')renderRT(state,renderControls,showDialog,escapeHTML,widths);if(view==='calibration')renderCalibration();if(view==='parameters')renderParameters();if(view==='counters')renderCounters();if(view==='help')renderHelp();if(view==='backups')await renderBackups();
 }
 function render(){renderBoard();loadSelection();renderControls();if(state.view==='counters')renderCounters();}
@@ -186,10 +191,10 @@ function recordShortcut(){
     captured={kind:0,codes:combination,interval:30,cycles:1};$('#modal-confirm').disabled=false;capture.textContent=combination.map(keyName).join(' + ');
   };
 }
+$('#view-settings').onclick=event=>{const button=event.target.closest('[data-settings-view]');if(button)showView(button.dataset.settingsView);};
 $('#record-current').onclick=recordShortcut;
 $('#device-connect').onclick=()=>state.channel?toast('mini84v6pro 已连接。'):connect();
 $$('[data-rail]').forEach(button=>button.onclick=()=>showView(button.dataset.rail));
-$('#macro-nav').onclick=()=>{showView('keymap');state.definition.kind=2;renderEditor();$('.editor').scrollIntoView({behavior:'smooth',block:'start'});};
 $('#palette').ondragstart=event=>{const button=event.target.closest('[data-code]');if(!button)return;event.dataTransfer.setData('application/x-niz-code',button.dataset.code);event.dataTransfer.effectAllowed='copy';};
 $('#keyboard').ondragover=event=>{if(!event.dataTransfer.types.includes('application/x-niz-code'))return;const button=event.target.closest('[data-key]');if(button){event.preventDefault();event.dataTransfer.dropEffect='copy';button.classList.add('drag-over');}};
 $('#keyboard').ondragleave=event=>event.target.closest('[data-key]')?.classList.remove('drag-over');

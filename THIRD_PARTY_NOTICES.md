@@ -4,3 +4,5 @@
 - Material Symbols UI icons: the same Google Material icons observed in Wootility, used for generic keyboard, settings, help, navigation, profile, search and calibration controls. Licensed under Apache License 2.0; see `dist/assets/MaterialIcons-LICENSE.txt`. Upstream: https://github.com/google/material-design-icons.
 
 Wootility is the requested visual reference. NiZ Web remains an independent configurator; Wooting product photographs, trademarks and application code are not included.
+
+备份、行程、校准调节、计数、设备、组合键和帮助书本图标为本项目绘制的 SVG，采用与现有图标一致的单色线条风格。
