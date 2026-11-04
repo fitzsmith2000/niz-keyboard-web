@@ -11,7 +11,7 @@ const escapeHTML=text=>String(text).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'
 const shortName=code=>({0:'—',27:'⌫',28:'Tab',42:'Caps',54:'Enter',55:'Shift',66:'Shift',67:'Ctrl',68:'⌘ / Win',69:'⌥ / Alt',70:'Space',71:'⌥ / Alt',72:'⌘ / Win',74:'Ctrl',78:'PrtSc',79:'ScrLk',83:'PgUp',84:'Del',86:'PgDn',156:'Fn',166:'Fn'}[code]??keyName(code));
 const widths={30:2,32:1.5,45:1.5,47:1.75,59:2.25,61:2.25,72:1.75,75:1.25,76:1.25,77:1.25,78:6.25};
 const sample=demoSnapshot();
-const state={view:'keymap',mode:'demo',snapshot:sample,baseline:structuredClone(sample),channel:null,layer:1,key:47,definition:{kind:0,codes:[42],interval:30,cycles:1},category:'basic',search:'',append:false,busy:false,logs:[],backupItems:[],calibrationSamples:0,calibrationReleaseDone:false,calibrationMessage:''};
+const state={view:'keymap',mode:'demo',connecting:false,snapshot:sample,baseline:structuredClone(sample),channel:null,layer:1,key:47,definition:{kind:0,codes:[42],interval:30,cycles:1},category:'basic',search:'',append:false,busy:false,logs:[],backupItems:[],calibrationSamples:0,calibrationReleaseDone:false,calibrationMessage:''};
 let modalAction=null, toastTimer;
 const summary=mapping=>{const d=decode(mapping);return d.kind<2?(d.kind===1?'连发 · ':'')+(d.codes.length?d.codes.map(keyName).join(' + '):'未分配'):`宏 · ${d.codes.length} 个动作`;};
 const changedTriggers=()=>Array.from({length:84},(_,i)=>i).filter(key=>state.snapshot.triggers.slice(key*3,key*3+3).some((n,i)=>n!==state.baseline.triggers[key*3+i]));
@@ -20,7 +20,11 @@ const selected=()=>state.snapshot.mappings[(state.layer-1)*84+state.key-1];
 const changed=()=>state.snapshot.mappings.filter((m,i)=>!equal(m,state.baseline.mappings[i]));
 function log(text) {state.logs.push({time:new Date().toLocaleTimeString('zh-CN',{hour12:false}),text});$('#status-text').textContent=text;}
 function toast(text){$('#toast').textContent=text;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,3000);}
-function progress(phase,ratio){$('#progress-label').textContent=phase;$('#progress-number').textContent=`${Math.round(ratio*100)}%`;$('#progress-bar').style.width=`${ratio*100}%`;$('#status-text').textContent=phase;}
+function progress(phase,ratio){
+  const flavor=$('#connection-flavor');
+  flavor.hidden=!state.connecting;
+  if(state.connecting)flavor.textContent=({'识别键盘':'正在初始化与加菲的脑机接口装置…','读取全部键位':'正在展开加菲的九重键位结界…','读取灯光备份':'正在回收键盘宇宙中的光子残影…','读取触发参数':'正在同步加菲的静电容神经脉冲…','读取按键计数':'正在检索这把键盘的战斗履历…','保存连接备份':'正在封存连接坐标，准备降临现实…'}[phase]??'正在与加菲的键盘宇宙建立连接…');
+$('#progress-label').textContent=phase;$('#progress-number').textContent=`${Math.round(ratio*100)}%`;$('#progress-bar').style.width=`${ratio*100}%`;$('#status-text').textContent=phase;}
 function showDialog(title,body,action=null,confirmLabel='确认') {
   $('#modal-title').textContent=title;$('#modal-body').innerHTML=body;$('#modal-confirm').textContent=confirmLabel;$('#modal-confirm').disabled=false;$('#modal-confirm').hidden=!action;$('#modal-cancel').textContent=action?'取消':'知道了';modalAction=action;
   if(!$('#modal').open)$('#modal').showModal();
@@ -136,7 +140,7 @@ function renderHelp(){
 async function showView(view){
   if(state.view==='rt'&&view!=='rt')await state.channel?.stopTracking();
   state.view=view;document.body.dataset.view=view;
-  const titles={settings:['设置','设置','查看设备信息，管理本机配置与备份。'],shortcuts:['组合键','组合键','查看原厂快捷操作，点击条目了解使用方法。'],keymap:['自定义按键','自定义按键','选择键帽后编辑，或拖动功能到键盘。'],counters:['按键计数','按键计数','查看设备内保存的累计计数，重新读取后刷新。'],backups:['备份与恢复','备份与恢复','自动保存在浏览器，也可以导出到本机。'],rt:['触发行程与 RT','触发行程与 RT','选择物理按键，设置 NiZ 动态快速触发区间与阈值。'],calibration:['静电容校准','静电容校准','先释放采样，再按需采集任意 1～4 个键。'],parameters:['设备参数','设备参数','读取原厂参数，保留完整备份。当前仅提供查看。'],help:['使用帮助','使用帮助','连接、编辑、保存到键盘与恢复配置。']};
+  const titles={settings:['设置','设置','查看设备信息，管理本机配置与备份。'],shortcuts:['宁芝组合键','宁芝组合键','查看原厂快捷操作，点击条目了解使用方法。'],keymap:['自定义按键','自定义按键','选择键帽后编辑，或拖动功能到键盘。'],counters:['按键计数','按键计数','查看设备内保存的累计计数，重新读取后刷新。'],backups:['备份与恢复','备份与恢复','自动保存在浏览器，也可以导出到本机。'],rt:['触发行程与 RT','触发行程与 RT','选择物理按键，设置 NiZ 动态快速触发区间与阈值。'],calibration:['静电容校准','静电容校准','先释放采样，再按需采集任意 1～4 个键。'],parameters:['设备参数','设备参数','读取原厂参数，保留完整备份。当前仅提供查看。'],help:['使用帮助','使用帮助','连接、编辑、保存到键盘与恢复配置。']};
   $('#page-name').textContent=titles[view][0];$('#main-title').textContent=titles[view][1];$('#subtitle').textContent=titles[view][2];
   $$('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
   ['keymap','rt','counters','backups','calibration','parameters','help','shortcuts','settings'].forEach(name=>$(`#view-${name}`).hidden=name!==view);
@@ -152,10 +156,12 @@ async function connect(){
     const [device]=await navigator.hid.requestDevice({filters:[{vendorId:MODEL.vendorId,productId:MODEL.productId,usagePage:MODEL.usagePage}]});
     if(!device){log('已取消连接，编辑内容保持不变。');return;}
     const channel=new NiZDevice(device);
+    state.connecting=true;progress('识别键盘',0.01);
     try{
-      await channel.open();const snapshot=await channel.snapshot(progress);await saveBackup(snapshot,'读取键盘');
+      await channel.open();const snapshot=await channel.snapshot(progress);progress('保存连接备份',0.97);await saveBackup(snapshot,'读取键盘');
       resetTravel();state.channel=channel;state.snapshot=snapshot;state.baseline=structuredClone(snapshot);state.mode='live';state.calibrationSamples=0;state.calibrationReleaseDone=false;state.calibrationMessage='';render();log('读取完成 · 84 键 × 9 层 · 已自动备份');toast('键盘已连接，原始配置已备份。');
     }catch(error){await channel.close();throw error;}
+    finally{state.connecting=false;$('#connection-flavor').hidden=true;}
   });
 }
 async function read(){
