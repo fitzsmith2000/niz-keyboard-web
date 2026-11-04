@@ -66,7 +66,7 @@ function renderControls(){
   if(state.view==='calibration')renderCalibration();
 }
 function renderBoard(){
-  $('#layers').innerHTML=Array.from({length:9},(_,i)=>`<button aria-label="配置层 ${i+1}" aria-pressed="${state.layer===i+1}" data-layer="${i+1}"><span class="layer-prefix">层 </span>${i+1}</button>`).join('');
+  $('#layers').innerHTML=Array.from({length:9},(_,i)=>`<button title="设备原始层 ${i+1}；Fn / 模式对应尚未确认" aria-label="配置层 ${i+1}，用途未确认" aria-pressed="${state.layer===i+1}" data-layer="${i+1}"><span class="layer-prefix">层 </span>${i+1}</button>`).join('');
   $('#keyboard').innerHTML=ROWS.map(row=>`<div class="keyboard-row">${row.map(key=>{
     const mapping=state.snapshot.mappings[(state.layer-1)*84+key-1],d=decode(mapping),label=d.kind>=2?'宏':d.kind===1?'连发':d.codes.length===1?shortName(d.codes[0]):d.codes.length?d.codes.map(shortName).join('+'):'—';
     const physical=shortName(DEFAULT_CODES[key-1]);
@@ -136,11 +136,18 @@ function renderHelp(){
 async function showView(view){
   if(state.view==='rt'&&view!=='rt')await state.channel?.stopTracking();
   state.view=view;document.body.dataset.view=view;
-  const titles={settings:['设置','设置','查看设备信息，管理本机配置与备份。'],shortcuts:['组合键','组合键','查看原厂快捷操作，点击条目了解使用方法。'],keymap:['自定义按键','自定义按键','选择键帽后编辑，或拖动功能到键盘。'],counters:['按键计数','按键计数','查看设备内保存的累计计数，重新读取后刷新。'],backups:['备份与恢复','备份与恢复','自动保存在浏览器，也可以导出到本机。'],rt:['触发行程与 RT','触发行程与 RT','选择物理按键，设置 NiZ 动态快速触发区间与阈值。'],calibration:['静电容校准','静电容校准','先释放采样，再按需采集任意 1～4 个键。'],parameters:['设备参数','设备参数','读取原厂参数，保留完整备份。当前仅提供查看。'],help:['使用帮助','使用帮助','连接、编辑、保存到键盘与恢复配置。']};
+  const titles={socd:['SOCD 输入测试','SOCD 输入测试','查看相反方向同时按下时，浏览器收到的键盘输出。'],settings:['设置','设置','查看设备信息，管理本机配置与备份。'],shortcuts:['组合键','组合键','查看原厂快捷操作，点击条目了解使用方法。'],keymap:['自定义按键','自定义按键','选择键帽后编辑，或拖动功能到键盘。'],counters:['按键计数','按键计数','查看设备内保存的累计计数，重新读取后刷新。'],backups:['备份与恢复','备份与恢复','自动保存在浏览器，也可以导出到本机。'],rt:['触发行程与 RT','触发行程与 RT','选择物理按键，设置 NiZ 动态快速触发区间与阈值。'],calibration:['静电容校准','静电容校准','先释放采样，再按需采集任意 1～4 个键。'],parameters:['设备参数','设备参数','读取原厂参数，保留完整备份。当前仅提供查看。'],help:['使用帮助','使用帮助','连接、编辑、保存到键盘与恢复配置。']};
   $('#page-name').textContent=titles[view][0];$('#main-title').textContent=titles[view][1];$('#subtitle').textContent=titles[view][2];
   $$('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));
-  ['keymap','rt','counters','backups','calibration','parameters','help','shortcuts','settings'].forEach(name=>$(`#view-${name}`).hidden=name!==view);
+  ['keymap','rt','counters','backups','calibration','parameters','help','shortcuts','settings','socd'].forEach(name=>$(`#view-${name}`).hidden=name!==view);
   $$('[data-rail]').forEach(button=>button.classList.toggle('active',button.dataset.rail===(view==='help'?'help':['settings','parameters','backups'].includes(view)?'settings':'keymap')));
+  if(view==='socd'){
+    $('#view-socd').innerHTML=`<article class="panel section-panel"><h2>SOCD · 相反方向冲突处理</h2><p>SOCD 用来决定相反方向同时按下时的输出，例如 A 与 D 同时按下时输出中立，或以后按下的方向优先。</p><p class="socd-status">当前未适配硬件 SOCD：尚未确认当前固件的开关及写入协议。</p><button class="button" disabled>启用硬件 SOCD（暂不可用）</button><p>下面只观察浏览器收到的键盘事件，不会改变系统、游戏或键盘固件的输出。</p><div id="socd-test" tabindex="0" role="group" aria-label="方向键输入测试"><strong>点击这里，再按 A / D 或 W / S</strong><p id="socd-keys">等待输入</p><small>先按住 A，再按住 D，依次松开；W / S 同理。失去焦点后清空。改键后以实际输出字符为准，网页无法确认事件来自哪一把键盘。</small></div></article>`;
+    const held=new Set(),test=$('#socd-test');
+    test.onkeydown=event=>{if(!['KeyA','KeyD','KeyW','KeyS'].includes(event.code))return;event.preventDefault();held.add(event.code);$('#socd-keys').textContent=Array.from(held,key=>key.slice(3)).join(' + ')||'无方向输出';};
+    test.onkeyup=event=>{if(!['KeyA','KeyD','KeyW','KeyS'].includes(event.code))return;event.preventDefault();held.delete(event.code);$('#socd-keys').textContent=Array.from(held,key=>key.slice(3)).join(' + ')||'无方向输出';};
+    test.onblur=()=>{held.clear();$('#socd-keys').textContent='已清空，点击后继续测试';};
+  }
   if(view==='settings')$('#view-settings').innerHTML=`<div class="help-grid"><article class="panel section-panel"><h2>设备参数</h2><p>查看触发参数、固件标识和 USB 信息。</p><button class="button" data-settings-view="parameters">查看设备参数</button></article><article class="panel section-panel"><h2>备份与恢复</h2><p>管理本机备份，导入或导出 JSON 配置。</p><button class="button" data-settings-view="backups">管理配置备份</button></article></div>`;
   if(view==='shortcuts')renderShortcuts(state,escapeHTML);if(view==='rt')renderRT(state,renderControls,showDialog,escapeHTML,widths);if(view==='calibration')renderCalibration();if(view==='parameters')renderParameters();if(view==='counters')renderCounters();if(view==='help')renderHelp();if(view==='backups')await renderBackups();
 }
