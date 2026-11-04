@@ -163,6 +163,24 @@
       "rawMin": 0,
       "rawMax": 40,
       "configurationWrites": false
+    },
+    "presentationMotion": {
+      "version": "0.7.1",
+      "result": "PASS",
+      "test": "tests/browser_motion.py",
+      "easing": "cubic ease-out",
+      "durationMs": "80% of scan duration, clamped to 60–140",
+      "checks": [
+        "intermediateAnimationFrames",
+        "nonlinearProgress",
+        "noOvershoot",
+        "continuousRetarget",
+        "separateKeyReset",
+        "emptyState",
+        "stopSettles",
+        "reducedMotion"
+      ],
+      "rawPeakHistoryUnmodified": true
     }
   }
 }
