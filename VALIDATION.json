@@ -46,7 +46,7 @@
     }
   },
   "protocolTests": {
-    "passed": 22,
+    "passed": 27,
     "failed": 0
   },
   "reference": {
@@ -110,5 +110,59 @@
       "responsive"
     ],
     "competitionFirmwareFlashed": false
+  },
+  "travelTracking": {
+    "firmware": "mini84EC(S);V2.3.3;V1.0;",
+    "physicalProtocol": {
+      "result": "PASS",
+      "transport": "macOS IOKit HID",
+      "physicalKey": 48,
+      "userConfirmedPressRelease": true,
+      "samples": 571,
+      "rawMin": 1,
+      "rawMax": 40,
+      "distinctRawValues": 27,
+      "commands": [
+        "F9",
+        "CF"
+      ],
+      "configurationWrites": false
+    },
+    "browserIntegration": {
+      "result": "PASS",
+      "transport": "Chrome simulated WebHID",
+      "test": "tests/browser_tracking.py",
+      "physicalBrowserSessionTested": false,
+      "checks": [
+        "nativeDisplayAndRaw",
+        "peak",
+        "stopAndNavigationCleanup",
+        "hiddenStops",
+        "wrongKeyTimeout",
+        "usbErrorClearsLiveValue",
+        "readOnly",
+        "mobile",
+        "all84Queried",
+        "automaticFocus",
+        "simultaneousKeys",
+        "independentPeaks"
+      ]
+    },
+    "documentation": "TRAVEL_TRACKING.md",
+    "fullScanPhysicalProtocol": {
+      "result": "PASS",
+      "transport": "macOS IOKit HID",
+      "userConfirmedDifferentAndSimultaneousKeys": true,
+      "keysPerRound": 84,
+      "rounds": 343,
+      "samples": 28812,
+      "errors": 0,
+      "seconds": 60.14988195896149,
+      "averageRoundMs": 175.36,
+      "differentKeysWithTravel": 25,
+      "rawMin": 0,
+      "rawMax": 40,
+      "configurationWrites": false
+    }
   }
 }

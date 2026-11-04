@@ -1,3 +1,4 @@
+import {parseTravel,chooseTravel} from '../dist/tracking.js';
 import {triggerPackets} from '../dist/rt.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -184,4 +185,58 @@ test('combined keymap and RT save commits both areas and preserves lights',async
   const after=await channel.write(target,base,async()=>{});
   assert.deepEqual(after.mappings,target.mappings);assert.deepEqual(after.triggers,target.triggers);assert.deepEqual(after.lights,base.lights);
   assert.ok(device.sent.findIndex(p=>p[1]===0xf6)<device.sent.findIndex(p=>p[1]===0xd2));await channel.close();
+});
+
+test('physical travel replies validate opcode/key and follow the native mini84 endpoint display',()=>{
+  assert.deepEqual(parseTravel(command(0xcf,[48,1]),48),{key:48,raw:1,mm:0});
+  assert.equal(parseTravel(command(0xcf,[48,8]),48).mm,0);
+  assert.equal(parseTravel(command(0xcf,[48,23]),48).mm,2.3);
+  assert.equal(parseTravel(command(0xcf,[48,36]),48).mm,4);
+  assert.equal(parseTravel(command(0xcf,[48,40]),48).mm,4);
+  assert.throws(()=>parseTravel(command(0xcf,[49,23]),48),/不一致/);
+  assert.throws(()=>parseTravel(command(0xcf,[48,41]),48),/超出范围/);
+  assert.throws(()=>parseTravel([0,0xcf,48,23],48),/不一致/);
+});
+test('travel polling uses CF physical key requests, serializes reports and stops cleanly',async()=>{
+  const device=new FakeHID(),channel=new NiZDevice(device);await channel.open();
+  const send=device.sendReport.bind(device);device.sendReport=async(id,p)=>{
+    if(p[1]!==0xcf)return send(id,p);
+    device.sent.push(Array.from(p));const response=command(0xcf,[p[2],23]);queueMicrotask(()=>device.emit(response));
+  };
+  const samples=[];let ended=false;
+  channel.startTracking(frame=>samples.push(frame),()=>{ended=true;});
+  assert.equal(channel.trackingActive,true);
+  await assert.rejects(()=>channel.snapshot(),/停止实时行程/);
+  await assert.rejects(()=>channel.beginCalibration(async()=>{}),/停止实时行程/);
+  await new Promise(resolve=>setTimeout(resolve,230));await channel.stopTracking();
+  assert.ok(samples.length>=1);assert.equal(samples[0].samples.length,84);assert.equal(samples[0].samples[47].mm,2.3);assert.deepEqual(samples[0].samples.map(s=>s.key),Array.from({length:84},(_,i)=>i+1));assert.equal(ended,true);assert.equal(channel.trackingActive,false);assert.equal(channel.pending,null);
+  const count=device.sent.length;await new Promise(resolve=>setTimeout(resolve,150));assert.equal(device.sent.length,count);
+  assert.ok(device.sent.every(p=>p[1]===0xcf&&p[2]>=1&&p[2]<=84&&p[3]===0));await channel.close();
+});
+test('invalid samples and USB failures end tracking instead of generating data',async()=>{
+  const device=new FakeHID(),channel=new NiZDevice(device);await channel.open();
+  let error;const samples=[];
+  device.sendReport=async(id,p)=>queueMicrotask(()=>device.emit(command(0xcf,[p[2],255])));
+  channel.startTracking(s=>samples.push(s),e=>{error=e;});
+  await new Promise(resolve=>setTimeout(resolve,120));assert.match(error.message,/超出范围/);assert.equal(samples.length,0);assert.equal(channel.trackingActive,false);
+  device.sendReport=async()=>{throw Error('USB disconnected');};
+  channel.startTracking(s=>samples.push(s),e=>{error=e;});await new Promise(resolve=>setTimeout(resolve,120));
+  assert.match(error.message,/USB disconnected/);assert.equal(samples.length,0);assert.equal(channel.pending,null);await channel.close();
+});
+test('closing a polling connection waits for its pending response and closes without more commands',async()=>{
+  const device=new FakeHID(),channel=new NiZDevice(device);await channel.open();const samples=[];
+  device.sendReport=async(id,p)=>{device.sent.push(Array.from(p));setTimeout(()=>device.emit(command(0xcf,[p[2],20])),60);};
+  channel.startTracking(s=>samples.push(s));await new Promise(resolve=>setTimeout(resolve,100));await channel.close();
+  assert.equal(device.opened,false);assert.equal(channel.trackingActive,false);assert.equal(channel.pending,null);assert.equal(samples.length,0);
+  const count=device.sent.length;await new Promise(resolve=>setTimeout(resolve,150));assert.equal(device.sent.length,count);
+});
+
+test('automatic focus detects any key, keeps simultaneous keys and ignores release-end noise',()=>{
+  const sample=(key,raw)=>parseTravel(command(0xcf,[key,raw]),key);
+  assert.equal(chooseTravel([sample(1,1),sample(48,2)],new Map(),null).focused,null);
+  const first=chooseTravel([sample(1,1),sample(48,23)],new Map(),null);assert.equal(first.focused.key,48);
+  const next=chooseTravel([sample(1,16),sample(48,23)],new Map([[1,0],[48,2.3]]),48);
+  assert.equal(next.focused.key,1);assert.deepEqual(next.pressed.map(s=>s.key),[1,48]);
+  assert.equal(chooseTravel([sample(1,16),sample(48,23)],new Map([[1,1.6],[48,2.3]]),1).focused.key,1);
+  assert.equal(chooseTravel([sample(1,1),sample(48,2)],new Map([[1,1.6],[48,2.3]]),1).focused.mm,0);
 });

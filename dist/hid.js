@@ -1,4 +1,5 @@
 import {MODEL,assert,command,parseReports,parseBlob,equal} from './protocol.js';
+import {parseTravel} from './tracking.js';
 import {triggerPackets} from './rt.js';
 const pause = ms=>new Promise(resolve=>setTimeout(resolve,ms));
 export class NiZDevice {
@@ -6,6 +7,7 @@ export class NiZDevice {
     assert(device.vendorId===MODEL.vendorId&&device.productId===MODEL.productId&&device.collections.some(c=>c.usagePage===MODEL.usagePage&&c.outputReports.some(r=>r.reportId===0&&r.items.reduce((bits,item)=>bits+item.reportSize*item.reportCount,0)===512)), '所选设备没有受支持的 mini84 配置接口。');
     this.device=device;
     this.pending=null;
+    this.tracking=null;
     this.calibrationActive=false;
     this.calibrationReleased=false;
     this.input=event=>{
@@ -22,12 +24,13 @@ export class NiZDevice {
   }
   async open() { if(!this.device.opened) await this.device.open(); }
   async close() {
+    await this.stopTracking();
     if(this.pending){this.pending.reject(new Error('设备连接已关闭。'));await Promise.resolve();}
     try { if(this.calibrationActive&&this.device.opened) await this.endCalibration(); }
     finally { this.device.removeEventListener('inputreport',this.input); if(this.device.opened) await this.device.close(); }
   }
-  async query(op,end=null,{reply=[0,op],timeout=12000}={}) {
-    await pause(80); // Confirmed mini84 needs a pause after each stream terminator.
+  async query(op,end=null,{reply=[0,op],timeout=12000,payload=[],gap=80}={}) {
+    if(gap)await pause(gap); // Stream reads need 80 ms; CF single-key queries can run consecutively.
     assert(!this.pending,'另一项读取正在进行中。');
     let timer;
     const result=new Promise((resolve,reject)=>{
@@ -35,11 +38,34 @@ export class NiZDevice {
       timer=setTimeout(()=>reject(new Error('键盘响应超时。请关闭其他配置工具，检查数据线后重试。')),timeout);
     });
     // Attach a rejection handler before sendReport so a USB failure cannot leave an unhandled receiver.
-    const sending=this.device.sendReport(0,new Uint8Array(command(op))).catch(error=>this.pending?.reject(error));
+    const sending=this.device.sendReport(0,new Uint8Array(command(op,payload))).catch(error=>this.pending?.reject(error));
     try { const packets=await result; await sending; return packets; }
     finally { clearTimeout(timer); this.pending=null; }
   }
+  get trackingActive(){return this.tracking!==null;}
+  startTracking(onFrame,onEnd=()=>{}){
+    assert(this.device.opened&&!this.calibrationActive&&!this.pending&&!this.tracking,'当前设备正在执行其他操作，请先等待完成。');
+    const job={active:true,task:null};
+    this.tracking=job;
+    job.task=(async()=>{
+      while(job.active){
+        const samples=[],started=performance.now();
+        for(let key=1;key<=84&&job.active;key++){
+          const reports=await this.query(0xcf,null,{payload:[key,0],reply:[0,0xcf,key],timeout:1200,gap:0});
+          if(job.active)samples.push(parseTravel(reports[reports.length-1],key));
+        }
+        if(samples.length===84)onFrame({samples,scanMs:performance.now()-started});
+        await pause(0); // Yield between complete scans, including synchronous test devices.
+      }
+    })().then(()=>null,error=>error).then(error=>{this.tracking=null;onEnd(error);});
+  }
+  async stopTracking(){
+    if(!this.tracking)return;
+    const job=this.tracking;job.active=false;
+    await job.task;
+  }
   async snapshot(progress=()=>{}) {
+    assert(!this.trackingActive,'请先停止实时行程跟踪。');
     assert(!this.calibrationActive,'请先结束校准并恢复键盘输入。');
     progress('识别键盘',0.03);
     const versionBytes=(await this.query(0xf9))[0].slice(2);
@@ -89,6 +115,7 @@ export class NiZDevice {
     this.calibrationReleased=false;
   }
   async write(target,baseline,saveBackup,progress=()=>{}) {
+    assert(!this.trackingActive,'请先停止实时行程跟踪。');
     assert(!this.calibrationActive,'校准期间不能写入按键配置。');
     const triggerChanged=!equal(target.triggers,baseline.triggers);
     const triggerReports=triggerChanged?triggerPackets(target.triggers,baseline.triggers):[];
